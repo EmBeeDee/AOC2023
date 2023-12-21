@@ -17,10 +17,12 @@ object AOC20
 		val wiring = Wiring(modules.groupBy(_.name).map(p=> (p._1,p._2.head)))
 
 		val t = System.currentTimeMillis()
+		//wiring.initState()
+		//val res = wiring.press(1000)
+		//println(res)
 		wiring.initState()
-		val res = wiring.press(1000)
-		println(res)
-		wiring.initState()
+		// This never completes... instead look at the output and see what the cycles for the fh, fz, mf and ss modules are.
+		// The answer is the LCM of these four cycle numbers...
 		val n = wiring.untilMachineOn()
 		println(n)
 		println((System.currentTimeMillis()-t)+"ms")
@@ -45,6 +47,8 @@ object AOC20
 		def receive(signal: Signal): List[Signal]
 		def send(pulse: Boolean) = outs.map(Signal(name,_,pulse))
 		def shortString = ""
+		def stateString(state: Boolean) = if (state) "H" else "_"
+		def nStates = 1L
 	}
 
 	case class Broadcast(name: String, outs: List[String]) extends Module {
@@ -61,6 +65,8 @@ object AOC20
 				send(state)
 			}
 			else Nil
+		override def shortString = "%"+name+"="+stateString(state)
+		override def nStates: Long = 2L
 	}
 
 	case class Conjunction(name: String, outs: List[String]) extends Module {
@@ -73,13 +79,15 @@ object AOC20
 			val allHigh = state.values.forall(s=>s)
 			send(!allHigh)
 		}
-		override def shortString = name+" = "+state.values.map(if (_) "H" else "_").mkString+"  "
+		override def shortString = "&"+name+"="+state.values.map(stateString).mkString
+		override def nStates: Long = Math.pow(2, state.size).toLong
 	}
 
 	case class Wiring(modules: Map[String,Module]) {
 		var loSent = 0
 		var hiSent = 0
 		var machineOn = false
+		var endStates:Map[String,Long] = Map("fh"->0,"mf"->0,"fz"->0,"ss"->0)
 		def initState(): Unit = {
 			loSent = 0
 			hiSent = 0
@@ -88,23 +96,28 @@ object AOC20
 		}
 		def init(m: Module) = m.init(modules.values.filter(_.outs.contains(m.name)).map(_.name).toList)
 		def record(pulse: Boolean) = if (pulse) hiSent+=1 else loSent+=1
-		def pressButton(pulse: Boolean): Unit = {
+		def pressButton(pulse: Boolean, n: Long): Unit = {
 			var curr = List(Signal("", "broadcaster", pulse))
+			var c = 0
 			while (curr.nonEmpty) {
 				var next = List[Signal]()
 				for (s <- curr) {
 					record(s.pulse)
 					if (s.to=="rx" && !s.pulse) machineOn = true
 					next++= modules.get(s.to).map(_.receive(s)).toList.flatten
+					updateEndStates(n)
+					c+= 1
 				}
 				curr = next
 			}
+			if ((n & (n - 1)) == 0)
+				println(n+" "+c)
 		}
 		def press(n: Long): Long = {
 			var c = 0L
 			while (c<n) {
-				pressButton(false)
 				c+= 1
+				pressButton(false, c)
 			}
 			hiSent*loSent
 		}
@@ -112,13 +125,35 @@ object AOC20
 			var c = 0L
 			while (!machineOn) {
 				c+= 1
-				pressButton(false)
-				printState
+				pressButton(false, c)
+				//printState
 			}
 			c
 		}
 
-		def printState = println(modules.values.map(_.shortString).mkString)
+		def updateEndStates(c: Long) = {
+			val es = endStates.keys
+			var changed = false
+			for (m <- es) {
+				if (modules(m).shortString.endsWith("_")) {
+					val esc = endStates(m)
+					if (c>esc) {
+						endStates+= m->c
+						changed=true
+						println(c+" "+m+" "+(c-esc))
+					}
+				}
+			}
+			//if (changed)				println(endStates)
+		}
+
+		var statesSeen = Set[String]()
+		def printState = {
+			val state = modules.values.map(_.shortString).mkString(" ")
+			if (statesSeen(state)) throw new Exception("Seen "+state)
+			statesSeen+= state
+			println(statesSeen.size+" "+state)
+		}
 	}
 
 	def tokens(s: String): List[String] = s.split(' ').toList.map(_.trim).filter(_.size>0)

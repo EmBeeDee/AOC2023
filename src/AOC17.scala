@@ -15,7 +15,7 @@ object AOC17
 
 	def main(args: Array[String]): Unit =
 	{
-		val lines = input1.split("\\\n")
+		val lines = input0.split("\\\n")
 		val grid = Grid(lines.map(_.toVector.map(_.asDigit)).toVector)
 		grid.print()
 
@@ -88,16 +88,13 @@ object AOC17
 		}
 
 		def dijkstra(): Int = {
-			val d1 = dijkstra(Point(0,1))
-			println("D1 = "+d1)
-			val d2 = dijkstra(Point(1,0))
-			println("D2 = "+d2)
-			d1.min(d2)
+			// Start with a diagonal, which allows any change of direction!
+			dijkstra(Point(1,1))
 		}
 		def dijkstra(initDir: Point): Int = {
 			var seen = Set[Node]()
 			val queue = mutable.PriorityQueue[Path]()
-			val startNode = Node(Point(0,0), initDir, 0)
+			val startNode = Node(Point(0,0), initDir, minSteps) // Need to start at minSteps because the startNode dir is a diagonal
 			seen+= startNode
 			queue+= Path(startNode, 0)
 			while (queue.nonEmpty) {
