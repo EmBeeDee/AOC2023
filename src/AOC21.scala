@@ -22,7 +22,7 @@ object AOC21
 		val n = grid.findPlots(steps)
 		val centred = grid.centreS
 		centred.print()
-		val n2 = centred.scale(100).findPlotsInf2(steps)
+		val n2 = centred.expand(5).findPlotsInf2(steps)
 		println(n)
 		println(n2)
 		println((System.currentTimeMillis()-t)+"ms")
@@ -64,7 +64,8 @@ object AOC21
 			Grid(newGrid)
 		}
 
-		def scale(n: Int): Grid = {
+		/* Adds n copies of the grid all around it; for n=1 we get 3x3 the original, n=2 gives 5x5, etc */
+		def expand(n: Int): Grid = {
 			def scale[T](v: Vector[T], by: Int): Vector[T] = (0 until by).toVector.flatMap(i => v)
 
 			val gNoStart = g.map(line => replaceS(line))
@@ -128,7 +129,7 @@ object AOC21
 		def findPlots(total: Int): Int = visitPlots(total).filter(_._2 % 2 == total % 2).size
 
 		def findPlotsInf(total: Int): BigInt = {
-			val g9 = scale(1)
+			val g9 = expand(1)
 			g9.print()
 			val visited9 = g9.visitPlots(total+2*(w+h))
 			var c = BigInt(0)
@@ -160,47 +161,48 @@ object AOC21
 		}
 
 		def findPlotsInf2(total: Int): BigInt = {
-			val g9 = scale(1)
+			val g9 = expand(1)
 			//g9.print()
-			val visited9 = g9.visitPlots(total+2*(w+h))
-			var c = BigInt(0)
+			val visited9 = g9.visitPlots(total+2*g9.w)
 			val max = (total+w/2)/w
 			val centre = visited9.filter(_._1.inside(Point(w,h),Point(w*2,h*2)))
-			for (v0 <- centre) {
-				def onLine(base: Int): Int = {
-					var k = max
-					while (base+(k-1)*w > total) k-= 1
-					//if (base%2==total%2) (k+1)/2 else k/2
-					var c2 = 0
-					while (k>0) {
-						val d = base+(k-1)*w
-						if (d%2==total%2) c2+= 1
-						k-= 1
-					}
-					c2
+
+			def onLine(base: Int): Long = {
+				var k = max.toLong
+				var d = base+(k-1)*w
+				while (d>total || d%2!=total%2) {
+					k-= 1
+					d = base+(k-1)*w
 				}
-				def quadrant(base: Int): Int = {
-					var k = max
-					while (base+(k-1)*w > total) k-= 1
-					var c2 = 0
-					while (k>0) {
-						val d = base+(k-1)*w
-						if (d%2==total%2) c2+= k
-						k-= 1
-					}
-					c2
-				}
-				if (v0._2<=total && v0._2%2==total%2) c+= 1
-				c+= onLine(visited9(v0._1.add(Point(w,0))))
-				c+= onLine(visited9(v0._1.add(Point(0,h))))
-				c+= onLine(visited9(v0._1.add(Point(-w,0))))
-				c+= onLine(visited9(v0._1.add(Point(0,-h))))
-				c+= quadrant(visited9(v0._1.add(Point(w,h))))
-				c+= quadrant(visited9(v0._1.add(Point(-w,h))))
-				c+= quadrant(visited9(v0._1.add(Point(-w,-h))))
-				c+= quadrant(visited9(v0._1.add(Point(w,-h))))
+				(k+1)/2
 			}
-			c
+			def quadrant(base: Int): Long = {
+				var k = max.toLong
+				var d = base+(k-1)*w
+				while (d>total || d%2!=total%2) {
+					k-= 1
+					d = base+(k-1)*w
+				}
+				(k+1)/2 * (k/2+1)
+			}
+
+			def countUp(fn: (Point,Int)=>Long): BigInt = {
+				var c = BigInt(0)
+				centre.foreach(v=> c+= fn(v._1,v._2))
+				println("Counted "+c)
+				c
+			}
+
+			val middle = countUp((p:Point,n:Int)=> if (n<=total && n%2==total%2) 1 else 0)
+			val right = countUp((p:Point,n:Int)=> onLine(visited9(p.add(Point(w,0)))))
+			val down = countUp((p:Point,n:Int)=> onLine(visited9(p.add(Point(0,h)))))
+			val left = countUp((p:Point,n:Int)=> onLine(visited9(p.add(Point(-w,0)))))
+			val up = countUp((p:Point,n:Int)=> onLine(visited9(p.add(Point(0,-h)))))
+			val br = countUp((p:Point,n:Int)=> quadrant(visited9(p.add(Point(w,h)))))
+			val bl = countUp((p:Point,n:Int)=> quadrant(visited9(p.add(Point(-w,h)))))
+			val tl = countUp((p:Point,n:Int)=> quadrant(visited9(p.add(Point(-w,-h)))))
+			val tr = countUp((p:Point,n:Int)=> quadrant(visited9(p.add(Point(w,-h)))))
+			middle+right+down+left+up+br+bl+tl+tr
 		}
 
 		def transpose: Grid = Grid(g.transpose)
