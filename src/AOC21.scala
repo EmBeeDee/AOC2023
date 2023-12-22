@@ -22,7 +22,9 @@ object AOC21
 		val n = grid.findPlots(steps)
 		val centred = grid.centreS
 		centred.print()
-		val n2 = centred.expand(5).findPlotsInf2(steps)
+		// This expansion required for the test data, because it doesn't have clear lines from the S tile!
+		//val n2 = centred.expand(5).findPlotsInf2(steps)
+		val n2 = centred.findPlotsInf2(steps)
 		println(n)
 		println(n2)
 		println((System.currentTimeMillis()-t)+"ms")
