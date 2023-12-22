@@ -9,10 +9,11 @@ object AOC20
 	val input = "%fl -> tf, gz\n%xb -> hl, tl\n%mq -> tf, fl\n%px -> hl, tm\n%dp -> xv\nbroadcaster -> js, ng, lb, gr\n&ql -> rx\n%gk -> hm\n%vp -> vf, sn\n%fp -> xb\n&lr -> ss, rm, dc, js, gk, dp, bq\n%xl -> gx, lr\n%xx -> hb\n%cb -> jg\n&hl -> nj, lb, tl, xx, hb, fp, mf\n%vr -> tf, hq\n%bq -> gk\n%jg -> qn\n%hb -> qk\n%qk -> hs, hl\n%gz -> tf\n%rm -> hj\n&tf -> cb, jg, fz, gr, zj, qn, kb\n%qn -> td\n%js -> lr, dc\n%qb -> nc\n%zj -> vr\n%td -> tf, zj\n%tl -> kg\n%gx -> lr\n%hm -> lr, rd\n&fh -> ql\n%nj -> xx\n%hq -> kb, tf\n%kg -> px, hl\n%dc -> dp\n%vf -> th, sn\n&mf -> ql\n%tm -> hl\n&fz -> ql\n%xd -> tn, sn\n%ng -> vp, sn\n%th -> qb\n%rd -> xl, lr\n%bt -> xd, sn\n%tv -> sn\n%nl -> bt\n%hs -> fp, hl\n%xv -> rm, lr\n%tn -> sn, tv\n%hj -> lr, bq\n&ss -> ql\n%sd -> nl\n&sn -> sd, fh, th, qb, nl, ng, nc\n%kb -> mq\n%lb -> nj, hl\n%gr -> tf, cb\n%nc -> sd"
 	val input1 = "broadcaster -> a, b, c\n%a -> b\n%b -> c\n%c -> inv\n&inv -> a"
 	val input2 = "broadcaster -> a\n%a -> inv, con\n&inv -> b\n%b -> con\n&con -> output"
+	val input3 = "broadcaster -> ng\n&ql -> rx\n&fh -> ql\n&sn -> fh, sd, th, qb, nl, ng, nc\n%tv -> sn\n%vp -> sn, vf\n%vf -> sn, th\n%xd -> sn, tn\n%tn -> sn, tv\n%bt -> sn, xd\n%ng -> sn, vp\n%th -> qb\n%qb -> nc\n%nc -> sd\n%sd -> nl\n%nl -> bt"
 
 	def main(args: Array[String]): Unit =
 	{
-		val lines = input.split("\\\n").toList
+		val lines = input3.split("\\\n").toList
 		val modules = lines.map(parseModule)
 		val wiring = Wiring(modules.groupBy(_.name).map(p=> (p._1,p._2.head)))
 
@@ -76,7 +77,7 @@ object AOC20
 		}
 		override def receive(signal: Signal) = {
 			state+= signal.from->signal.pulse
-			val allHigh = state.values.forall(s=>s)
+			val allHigh = state.values.forall(identity)
 			send(!allHigh)
 		}
 		override def shortString = "&"+name+"="+state.values.map(stateString).mkString
@@ -106,12 +107,14 @@ object AOC20
 					if (s.to=="rx" && !s.pulse) machineOn = true
 					next++= modules.get(s.to).map(_.receive(s)).toList.flatten
 					updateEndStates(n)
-					c+= 1
 				}
+				c+= 1
+				//printState
+				//println(n+" "+c+" "+modules.values.map(_.shortString).mkString(" ")+" "+next.mkString(" "))
 				curr = next
 			}
-			if ((n & (n - 1)) == 0)
-				println(n+" "+c)
+			println(n+" "+c+" "+modules.values.map(_.shortString).mkString(" "))
+			//println(n+" "+c)
 		}
 		def press(n: Long): Long = {
 			var c = 0L
@@ -134,13 +137,13 @@ object AOC20
 		def updateEndStates(c: Long) = {
 			val es = endStates.keys
 			var changed = false
-			for (m <- es) {
-				if (modules(m).shortString.endsWith("_")) {
-					val esc = endStates(m)
+			for (name <- es) {
+				if (modules.get(name).map(_.shortString.endsWith("_")).getOrElse(false)) {
+					val esc = endStates(name)
 					if (c>esc) {
-						endStates+= m->c
+						endStates+= name->c
 						changed=true
-						println(c+" "+m+" "+(c-esc))
+						println(c+" "+name+" "+(c-esc))
 					}
 				}
 			}

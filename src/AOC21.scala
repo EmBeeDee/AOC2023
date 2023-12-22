@@ -13,17 +13,16 @@ object AOC21
 
 	def main(args: Array[String]): Unit =
 	{
-		val lines = input1.split("\\\n")
+		val lines = input.split("\\\n")
 		val grid = Grid(lines.map(_.toVector).toVector)
 		grid.print()
 
 		val t = System.currentTimeMillis()
-		val steps = 500
+		val steps = 26501365
 		val n = grid.findPlots(steps)
 		val centred = grid.centreS
 		centred.print()
-		centred.printTopVisited(steps)
-		val n2 = centred.findPlotsInf(steps)
+		val n2 = centred.scale(100).findPlotsInf2(steps)
 		println(n)
 		println(n2)
 		println((System.currentTimeMillis()-t)+"ms")
@@ -35,6 +34,7 @@ object AOC21
 		def reflect = Point(y, x)
 		def add(p: Point) = Point(x+p.x, y+p.y)
 		def scale(n: Int) = Point(x*n, y*n)
+		def inside(topLeft: Point, botRight: Point) = x>=topLeft.x && x<botRight.x && y>=topLeft.y && y<botRight.y
 
 		override def toString: String = s"($x,$y)"
 	}
@@ -45,69 +45,78 @@ object AOC21
 		val start = {
 			val y = g.indexWhere(_.contains('S'))
 			val x = g(y).indexOf('S')
-			Point(x,y)
+			Point(x, y)
 		}
 
 		def print() = {
 			g.foreach(l => println(l.mkString))
 			println(s"Size $w by $h")
-			println("Non-rock = "+g.map(_.count(_!='#')).sum)
+			println("Non-rock = " + g.map(_.count(_ != '#')).sum)
 			println()
 		}
 
-		def replaceS(line: Vector[Char]) = line.map(c=> if(c=='S') '.' else c)
+		def replaceS(line: Vector[Char]) = line.map(c => if (c == 'S') '.' else c)
 
 		def makeEvenSize = {
 			var newGrid = g
-			if (w%2==1) newGrid = newGrid.map(x => x++replaceS(x))
-			if (h%2==1) newGrid = newGrid++newGrid.map(replaceS)
+			if (w % 2 == 1) newGrid = newGrid.map(x => x ++ replaceS(x))
+			if (h % 2 == 1) newGrid = newGrid ++ newGrid.map(replaceS)
 			Grid(newGrid)
 		}
 
-		def triple: Grid = {
-			val gWide = g.map(line => replaceS(line)++line++replaceS(line))
-			Grid(gWide++gWide++gWide)
+		def scale(n: Int): Grid = {
+			def scale[T](v: Vector[T], by: Int): Vector[T] = (0 until by).toVector.flatMap(i => v)
+
+			val gNoStart = g.map(line => replaceS(line))
+			val gWide = gNoStart.map(scale(_, 2 * n + 1))
+			val middle = g.map(line => {
+				val noStart = replaceS(line)
+				scale(noStart, n) ++ line ++ scale(noStart, n)
+			})
+			Grid(scale(gWide, n) ++ middle ++ scale(gWide, n))
 		}
-
-		def horizEdge(y: Int, fromX: Int, untilX: Int, visited: Map[Point,Int]): Map[Int,Int] =
-			visited.filter(p=> p._1.y==y && p._1.x>=fromX && p._1.x<untilX).map(p => (p._1.x-fromX)->p._2)
-
-		def vertEdge(x: Int, fromY: Int, untilY: Int, visited: Map[Point,Int]): Map[Int,Int] =
-			visited.filter(p=> p._1.x==x && p._1.y>=fromY && p._1.y<untilY).map(p => (p._1.y-fromY)->p._2)
 
 		def centreS: Grid = {
 			def centre[T](v: Vector[T], x: Int): Vector[T] = {
-				val h = v.size/2
-				if (x<h) v.slice(x+h+1,v.size)++v.slice(0,x+h+1)
-				else v.slice(x-h,v.size)++v.slice(0,x-h)
+				val h = v.size / 2
+				if (x < h) v.slice(x + h + 1, v.size) ++ v.slice(0, x + h + 1)
+				else v.slice(x - h, v.size) ++ v.slice(0, x - h)
 			}
+
 			Grid(centre(g.map(centre(_, start.x)), start.y))
 		}
 
-		def inside(p: Point) = p.x>=0 && p.x<w && p.y>=0 && p.y<h
+		def moveToOrigin(p: Point): Grid = {
+			def move[T](v: Vector[T], x: Int) = v.slice(x, v.size) ++ v.slice(0, x)
+
+			Grid(move(g.map(move(_, start.x)), start.y))
+		}
+
+		def inside(p: Point) = p.x >= 0 && p.x < w && p.y >= 0 && p.y < h
+
 		def get(p: Point) = g(p.y)(p.x)
-		def good(p: Point) = get(p)!='#'
-		def wrap(p: Point) = Point(Math.floorMod(p.x,w), Math.floorMod(p.y,h))
 
-		val allDirs = List(Point(1,0), Point(0,1), Point(0,-1), Point(-1,0))
+		def good(p: Point) = get(p) != '#'
 
-		def visitPlots(total: Int): Map[Point,Int] = {
-			var visited = Map[Point,Int]()
+		def wrap(p: Point) = Point(Math.floorMod(p.x, w), Math.floorMod(p.y, h))
+
+		val allDirs = List(Point(1, 0), Point(0, 1), Point(0, -1), Point(-1, 0))
+
+		def visitPlots(total: Int): Map[Point, Int] = {
+			var visited = Map[Point, Int]()
 			var toVisit = Set(start)
 			var n = 0
-			while (n<total && toVisit.nonEmpty) {
-				n+= 1
+			while (n < total && toVisit.nonEmpty) {
+				n += 1
 				var newPoints = Set[Point]()
 				for (p <- toVisit) {
 					for (d <- allDirs) {
 						val newP = p.add(d)
-						if (!visited.contains(newP)){
+						if (!visited.contains(newP)) {
 							if (inside(newP) && good(newP)) {
-								visited+= newP -> n
-								newPoints+= newP
+								visited += newP -> n
+								newPoints += newP
 							}
-						} else if (visited(newP)>n) {
-							visited+= newP -> n
 						}
 					}
 				}
@@ -116,28 +125,81 @@ object AOC21
 			visited
 		}
 
-		def printTopVisited(total: Int) = {
-			println(visitPlots(total).filter(_._1.y==0).toList.sortBy(_._1.x).map(_._2))
-		}
-
-		def findPlots(total: Int): Int = visitPlots(total).filter(_._2%2==total%2).size
+		def findPlots(total: Int): Int = visitPlots(total).filter(_._2 % 2 == total % 2).size
 
 		def findPlotsInf(total: Int): BigInt = {
-			val visited9 = triple.visitPlots(total)
-			val topEdge = horizEdge(0, w, w*2, visited9)
-			val bottomEdge = horizEdge(h-1, w, w*2, visited9)
-			val leftEdge = vertEdge(0, h, h*2, visited9)
-			val rightEdge = vertEdge(w-1, h, h*2, visited9)
-			val visited1 = visitPlots(total)
-			
-			val manhattan = w+h
+			val g9 = scale(1)
+			g9.print()
+			val visited9 = g9.visitPlots(total+2*(w+h))
 			var c = BigInt(0)
-			for (y <- 0 until h)
-				for (x <- 0 until w)
-					visited.get(Point(x,y)).foreach(n => {
+			val maxBx = (total+w/2+1)/w
+			val maxBy = (total+h/2+1)/h
+			val centre = visited9.filter(_._1.inside(Point(w,h),Point(w*2,h*2)))
+			//println(visited9.filter(_._2<=total).filter(_._2%2==total%2).size)
+			for (by <- -maxBy to maxBy)
+				for (bx <- -maxBx to maxBx) {
+					if (bx==0 && by==0)
+						c+= centre.filter(_._2<=total).filter(_._2%2==total%2).size
+					else {
+						val b0x = bx.signum*w
+						val b0y = by.signum*h
+						for (p0 <- centre.keys) {
+							val px = p0.x+b0x
+							val py = p0.y+b0y
+							var steps = visited9(Point(px,py))
+							steps+= w*(bx-bx.signum).abs
+							steps+= h*(by-by.signum).abs
+							if (steps<=total && steps%2==total%2) {
+								println(s"$px,$py $steps ${visited9(Point(px,py))}")
+								c+= 1
+							}
+						}
+					}
+				}
+			c
+		}
 
-						c+= (total-n+manhattan)/manhattan
-					})
+		def findPlotsInf2(total: Int): BigInt = {
+			val g9 = scale(1)
+			//g9.print()
+			val visited9 = g9.visitPlots(total+2*(w+h))
+			var c = BigInt(0)
+			val max = (total+w/2)/w
+			val centre = visited9.filter(_._1.inside(Point(w,h),Point(w*2,h*2)))
+			for (v0 <- centre) {
+				def onLine(base: Int): Int = {
+					var k = max
+					while (base+(k-1)*w > total) k-= 1
+					//if (base%2==total%2) (k+1)/2 else k/2
+					var c2 = 0
+					while (k>0) {
+						val d = base+(k-1)*w
+						if (d%2==total%2) c2+= 1
+						k-= 1
+					}
+					c2
+				}
+				def quadrant(base: Int): Int = {
+					var k = max
+					while (base+(k-1)*w > total) k-= 1
+					var c2 = 0
+					while (k>0) {
+						val d = base+(k-1)*w
+						if (d%2==total%2) c2+= k
+						k-= 1
+					}
+					c2
+				}
+				if (v0._2<=total && v0._2%2==total%2) c+= 1
+				c+= onLine(visited9(v0._1.add(Point(w,0))))
+				c+= onLine(visited9(v0._1.add(Point(0,h))))
+				c+= onLine(visited9(v0._1.add(Point(-w,0))))
+				c+= onLine(visited9(v0._1.add(Point(0,-h))))
+				c+= quadrant(visited9(v0._1.add(Point(w,h))))
+				c+= quadrant(visited9(v0._1.add(Point(-w,h))))
+				c+= quadrant(visited9(v0._1.add(Point(-w,-h))))
+				c+= quadrant(visited9(v0._1.add(Point(w,-h))))
+			}
 			c
 		}
 
