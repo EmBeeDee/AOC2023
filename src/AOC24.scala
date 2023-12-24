@@ -21,7 +21,7 @@ object AOC24
 		val t = System.currentTimeMillis()
 		val n = space.countIntersections(min,max)
 		println(n)
-
+		space.printSimultaneousEquations()
 		println((System.currentTimeMillis()-t)+"ms")
 	}
 
@@ -56,12 +56,6 @@ object AOC24
 				Some(Point(mx,my,0))
 			}
 		}
-		def printIntersectXY(h: Hail) = {
-			val i = intersectXY(h)
-			println(this+" intersect "+h+" = "+i)
-			i
-		}
-
 	}
 
 	case class Space(hail: List[Hail]) {
@@ -81,6 +75,45 @@ object AOC24
 				for (b  <- 0 until hail.size)
 					if (b>a && int(hail(a),hail(b))) count+= 1
 			count
+		}
+
+		def tetrahedralVolume(h1: Hail, h2: Hail): BigDecimal = {
+			val (a,b,c) = (h1.p.x-h2.p2.x, h1.p2.x-h2.p2.x, h2.p.x-h2.p2.x)
+			val (d,e,f) = (h1.p.y-h2.p2.y, h1.p2.y-h2.p2.y, h2.p.y-h2.p2.y)
+			val (g,h,i) = (h1.p.z-h2.p2.z, h1.p2.z-h2.p2.z, h2.p.z-h2.p2.z)
+			val af = (e*i)-(f*h)
+			val bf = (d*i)-(f*g)
+			val cf = (d*h)-(e*g)
+			(((a*af) - (b*bf)) + (c*cf)).abs
+		}
+
+		def findSkewLines(found: List[Hail], remaining: List[Hail]): List[Hail] = {
+			if (found.size==3) found
+			else remaining match {
+				case Nil => found
+				case head::tail => if (found.forall(tetrahedralVolume(_,head)>0)) findSkewLines(head::found, tail) else findSkewLines(found, tail)
+			}
+		}
+
+		def printSimultaneousEquations(): Unit = {
+			// Not entirely sure this was necessary! Equations solve perfectly well on the first 3 hailstones of the example,
+			// the last pair of which are parallel.
+			val skewLines = findSkewLines(List(hail.head), hail.tail).reverse
+			if (skewLines.size<3) throw new Exception("Couldn't find 3 skew lines")
+			val (h1,h2,h3) = (skewLines(0), skewLines(1), skewLines(2))
+
+			def add(n: BigDecimal) = if (n>=0) s" + $n" else s" - ${-n}"
+
+			def equationsFor(h: Hail,hv: Char): List[String] =
+				List(s"x + ${hv} d == ${h.p.x}${add(h.d.x)}${hv}",
+					s"y + ${hv} e == ${h.p.y}${add(h.d.y)}${hv}",
+					s"z + ${hv} f == ${h.p.z}${add(h.d.z)}${hv}")
+			println("h1 = "+h1)
+			println("h2 = "+h2)
+			println("h3 = "+h3)
+			val wolframEquations = equationsFor(h1, 't')++equationsFor(h2, 'u')++equationsFor(h3, 'v')
+			val wolframCommand = "Solve["+wolframEquations.mkString(" && ")+", {x,y,z,d,e,f,t,u,v}]"
+			println(wolframCommand)
 		}
 	}
 
