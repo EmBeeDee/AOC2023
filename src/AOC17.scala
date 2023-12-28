@@ -20,8 +20,7 @@ object AOC17
 		grid.print()
 
 		val t = System.currentTimeMillis()
-		//println(grid.dijkstra())
-		println(grid.aStar())
+		println(grid.aStar)
 		println((System.currentTimeMillis()-t)+"ms")
 	}
 
@@ -51,80 +50,25 @@ object AOC17
 
 		val allDirs = List(Point(1,0), Point(0,1), Point(0,-1), Point(-1,0))
 
-		case class Node(loc: Point, dir: Point, steps: Int) {
-			def next(nextD: Point) = Node(loc.add(nextD), nextD, if (dir==nextD) steps+1 else 1)
-			def heur = w-loc.x + h-loc.y - 2
-		}
-		case class Path(node: Node, heatLoss: Int) extends Ordered[Path]{
-			override def compare(that: Path): Int = that.heatLoss.compare(heatLoss)
-		}
-
-		val minSteps = 4 //1
-		val maxSteps = 10 //3
-		def validDir(node: Node, nextDir: Point) = {
-			if (node.steps >= maxSteps) node.dir != nextDir
-			else if (node.steps < minSteps) node.dir == nextDir
-			else true
-		}
-
-		def dijkstra(): Int = {
-			// Start with a diagonal, which allows any change of direction!
-			dijkstra(Point(1,1))
-		}
-		def dijkstra(initDir: Point): Int = {
-			var seen = Set[Node]()
-			val queue = mutable.PriorityQueue[Path]()
-			val startNode = Node(Point(0,0), initDir, minSteps) // Need to start at minSteps because the startNode dir is a diagonal
-			seen+= startNode
-			queue+= Path(startNode, 0)
-			while (queue.nonEmpty) {
-				val curr = queue.dequeue()
-				if (curr.node.loc==goal && curr.node.steps>=minSteps && curr.node.steps<=maxSteps)
-					return curr.heatLoss
-				else {
-					val dir = curr.node.dir
-					allDirs.foreach(d => {
-						if (d!=dir.neg && validDir(curr.node, d)) {
-							val next = curr.node.next(d)
-							if (inside(next.loc) && !seen(next)) {
-								seen+= next
-								queue+= Path(next, curr.heatLoss+g(next.loc.y)(next.loc.x))
-							}
-						}
-					})
-				}
+		val minSteps = 4 // 1
+		val maxSteps = 10 // 3
+		
+		def aStar: Int = {
+			case class GridNode(loc: Point, dir: Point, steps: Int) extends GraphAlgorithms.Node {
+				def next(nextD: Point) = GridNode(loc.add(nextD), nextD, if (dir==nextD) steps+1 else 1)
+				def validDir(nextDir: Point) =
+					nextDir.neg!=dir && (steps>=maxSteps && dir!=nextDir || steps<maxSteps && (dir==nextDir || steps>=minSteps))
+				def valid = inside(loc) && (loc!=goal || steps>=minSteps)
+				override lazy val links: List[(GraphAlgorithms.Node, Int)] =
+					allDirs.filter(validDir).map(next).filter(_.valid).map(n=> Tuple2(n, g(n.loc.y)(n.loc.x)))
+				override val isGoal: Boolean = loc==goal
+				override val aStarHeuristic: Int = w-loc.x + h-loc.y - 2
+				override def toString: String = loc.toString
 			}
-			throw new Exception("No way through?!")
-		}
-
-		def aStar(): Int = {
 			// Start with a diagonal, which allows any change of direction!
-			aStar(Point(1,1))
-		}
-		def aStar(initDir: Point): Int = {
-			var seen = Set[Node]()
-			val queue = mutable.PriorityQueue[Path]()
-			val startNode = Node(Point(0,0), initDir, minSteps) // Need to start at minSteps because the startNode dir is a diagonal
-			seen+= startNode
-			queue+= Path(startNode, startNode.heur)
-			while (queue.nonEmpty) {
-				val curr = queue.dequeue()
-				if (curr.node.loc==goal && curr.node.steps>=minSteps && curr.node.steps<=maxSteps)
-					return curr.heatLoss
-				else {
-					val dir = curr.node.dir
-					allDirs.foreach(d => {
-						if (d!=dir.neg && validDir(curr.node, d)) {
-							val next = curr.node.next(d)
-							if (inside(next.loc) && !seen(next)) {
-								seen+= next
-								queue+= Path(next, curr.heatLoss-curr.node.heur+g(next.loc.y)(next.loc.x)+next.heur)
-							}
-						}
-					})
-				}
-			}
-			throw new Exception("No way through?!")
+			val (minDist, path) = GraphAlgorithms.aStar(GridNode(Point(0,0), Point(1,1), minSteps))
+			println(path.mkString(" "))
+			minDist
 		}
 	}
 

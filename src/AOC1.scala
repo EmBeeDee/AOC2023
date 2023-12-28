@@ -17,7 +17,7 @@ object AOC1
 
 	def extract(line: String): Int =
 	{
-		var s = replaceWordsEnd(replaceWordsStart(line))
+		val s = replaceWordsEnd(replaceWordsStart(line))
 		val n = extract1(s)
 		if (n != extract1(line))
 			println(n + " " + line)

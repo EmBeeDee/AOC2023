@@ -17,6 +17,7 @@ object AOC25
 
 		val t = System.currentTimeMillis()
 		graph.print()
+		graph.findConnectivity()
 		var merged = graph.karger
 		var links = merged.edges.size/2
 		var best = links
@@ -76,6 +77,58 @@ object AOC25
 				val edge = edges(n)
 				merge(edge._1, edge._2).karger
 			}
+		}
+
+		var connectivity = Map[(String,String), Int]()
+		def findConnectivity() = {
+			val quickLinks: Map[String,List[String]] = nodes.map(n=> (n, edges.filter(_._1==n).map(_._2))).toMap
+			def countUniquePaths(from: String, to: String): Int = {
+				var remaining = nodes-from
+				var c = 0
+
+				def findShortest(frontier: Set[String], visited: Map[String,String]): List[String] = {
+					def recoverPath(n: String): List[String] = {
+						if (n==from) List(n)
+						else n::recoverPath(visited(n))
+					}
+					if (visited.contains(to)) recoverPath(visited(to))
+					else {
+						var newFrontier = Set[String]()
+						var newVisited = visited
+						for (n <- frontier) {
+							val next = quickLinks(n).filter(remaining).filter(!visited.contains(_))
+							newVisited++= next.map(Tuple2(_,n))
+							newFrontier++= next
+						}
+						if (newFrontier.isEmpty) Nil
+						else findShortest(newFrontier, newVisited)
+					}
+				}
+
+				var startingFrontier = quickLinks(from).toSet
+				if (startingFrontier.contains(to)) {
+					c+= 1
+					startingFrontier = startingFrontier-to
+				}
+				while (remaining.nonEmpty) {
+					val frontier = startingFrontier.filter(remaining)
+					val path = findShortest(frontier, frontier.map(Tuple2(_,from)).toMap)
+					if (path.isEmpty)
+						return c
+					else {
+						remaining = remaining--path
+						c+= 1
+					}
+				}
+				c
+			}
+
+			for (n1 <- nodes) {
+				for (n2 <- nodes-n1)
+					connectivity+= (n1,n2) -> countUniquePaths(n1,n2)
+			}
+			val min = connectivity.values.min
+			connectivity.filter(_._2==min).foreach(println)
 		}
 	}
 
